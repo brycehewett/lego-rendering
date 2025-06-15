@@ -72,9 +72,14 @@ def get_2d_bounding_box(obj, camera):
     bounding_boxes = [] # bounding box for this part + children
 
     for child in obj.children:
-        bounding_boxes.append(get_2d_bounding_box(child, camera))
+        bbox = get_2d_bounding_box(child, camera)
+        if bbox is None:
+            print(f"[DEBUG] Child '{child.name}' returned None bounding box")
+        else:
+            bounding_boxes.append(bbox)
 
     if obj.type == 'MESH':
+        print(f"[DEBUG] Processing mesh object: {obj.name}")
         scene = bpy.context.scene
         mat = camera.matrix_world.normalized().inverted()
         depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -109,6 +114,9 @@ def get_2d_bounding_box(obj, camera):
 
             x = (co_local.x - min_x) / (max_x - min_x)
             y = (co_local.y - min_y) / (max_y - min_y)
+            
+            if len(lx) == 0 or len(ly) == 0:
+                print(f"[WARN] No valid projected vertices for object {obj.name}")
 
             lx.append(x)
             ly.append(y)
@@ -140,6 +148,7 @@ def get_2d_bounding_box(obj, camera):
         return None
 
     # combine all bounding boxes in a single box enclosing all
+    print(f"[DEBUG] Final combined bounding box from {len(bounding_boxes)} boxes")
     return reduce(lambda a, b: a.combine(b), bounding_boxes)
 
 def draw_bounding_box(bounding_box, input_filename):

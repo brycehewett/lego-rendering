@@ -2,4 +2,4 @@
 
 set -e
 
-/Applications/Blender.app/Contents/MacOS/Blender --background --python $1
+blender --background --python $1

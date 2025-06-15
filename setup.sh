@@ -26,6 +26,11 @@ if [ ! -d "./ldraw" ]; then
     echo ">>> Unzipping LDraw libraries"
     unzip -o ./temp/complete.zip -d ./
     unzip -o ./temp/unofficial.zip -d ./ldraw/unofficial
+    
+    #Remove unsupported materials
+    grep -Ev 'MATERIAL (FABRIC)' ./ldraw/LDConfig.ldr > ./ldraw/LDConfig.tmp && mv ./ldraw/LDConfig.tmp ./ldraw/LDConfig.ldr
+    grep -Ev 'MATERIAL (FABRIC)' ./ldraw/LDCfgalt.ldr > ./ldraw/LDCfgalt.tmp && mv ./ldraw/LDCfgalt.tmp ./ldraw/LDCfgalt.ldr
+
 else
     echo ">>> 'ldraw' folder already exists. Skipping downloads."
 fi

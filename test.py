@@ -1,6 +1,5 @@
 import random
 from time import sleep
-import bpy
 import sys
 import os
 
@@ -22,16 +21,17 @@ options = RenderOptions(
     image_filename = "renders/test.png",
     bounding_box_filename = "renders/test.txt",
     blender_filename = "renders/test.blend",
-    quality = Quality.DRAFT,
+    quality = Quality.HIGH,
     lighting_style = LightingStyle.DEFAULT,
     part_color = color.best_hex,
     material = Material.TRANSPARENT if color.is_transparent else Material.PLASTIC,
     light_angle = 160,
     part_rotation=(0, 0, random.uniform(0, 360)),
-    camera_height=90,
+    camera_height=50,
     zoom=1,
     look=Look.NORMAL,
     width=244,
     height=244,
 )
-renderer.render_part("3002", options)
+renderer.render_part("3037", options)
+renderer.coco_writer.save()

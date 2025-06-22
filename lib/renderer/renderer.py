@@ -7,6 +7,8 @@ from math import radians
 from lib.renderer.utils import place_object_on_ground, zoom_camera, set_height_by_angle, aim_towards_origin, get_2d_bounding_box, select_hierarchy
 from lib.renderer.lighting import setup_lighting
 from lib.renderer.render_options import Material
+from lib.annotation_writer import CocoWriter
+
 from io_scene_importldraw.loadldraw.loadldraw import LegoColours, BlenderMaterials
 
 # Render Lego parts
@@ -18,6 +20,8 @@ class Renderer:
         self.ldraw_parts_path = os.path.join(ldraw_path, "parts")
         self.ldraw_unofficial_parts_path = os.path.join(ldraw_path, "unofficial", "parts")
         self.has_imported_at_least_once = False
+        self.coco_writer = CocoWriter(output_file="./dataset/annotations/instances_train2017.json")
+
         # self.ldr_config = LdrConfig(ldraw_path="./ldraw")
         # self.ldr_config.open()
 
@@ -81,10 +85,21 @@ class Renderer:
             bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(options.blender_filename))
 
         # Save the bounding box coordinates in YOLO format
+        # Only if bounding box output is enabled
         if options.bounding_box_filename:
-            bounding_box = get_2d_bounding_box(part, camera).to_yolo(options.width, options.height)
-            with open(options.bounding_box_filename, 'w') as f:
-                f.write(f"0 {bounding_box[0]:.3f} {bounding_box[1]:.3f} {bounding_box[2]:.3f} {bounding_box[3]:.3f}\n")
+            # Step 1: get bounding box in pixel format
+            bbox_normalized = get_2d_bounding_box(part, camera)
+            xmin, ymin, xmax, ymax = bbox_normalized.to_pixel(options.width, options.height)
+
+            # Step 2: add image and annotation to COCO writer
+            image_filename = os.path.basename(options.image_filename)
+            image_id = self.coco_writer.add_image(image_filename, options.width, options.height)
+            self.coco_writer.add_annotation(
+                image_id=image_id,
+                category_name=ldraw_part_id,
+                bbox=(xmin, ymin, xmax, ymax)
+            )
+
 
     def import_part(self, ldraw_part_id, options):
         self.clear_scene()

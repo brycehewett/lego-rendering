@@ -183,6 +183,15 @@ class BoundingBox:
             self.width/image_width,
             self.height/image_width
         ]
+    
+    def to_pixel(self, image_width, image_height):
+        cx, cy = self.center
+        w, h = self.width, self.height
+        xmin = int(cx - w / 2)
+        xmax = int(cx + w / 2)
+        ymin = int(cy - h / 2)
+        ymax = int(cy + h / 2)
+        return (xmin, ymin, xmax, ymax)
 
     def __repr__(self):
         return f"BoundingBox({self.x1}, {self.y1}, {self.x2}, {self.y2})"

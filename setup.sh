@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#TODO: Move downloads and setup scripts to python
 set -euo pipefail
 
 echo ">>> Starting Blender setup at $(date)"
@@ -36,7 +36,7 @@ else
     echo ">>> 'ldraw' folder already exists. Skipping Ldraw downloads."
 fi
 
-if [ ! -d "./lego-data" ]; then
+if [ ! -f "lego_parts.db" ]; then
     echo ">>> 'lego-data' folder not found. Downloading Lego data..."
 
     mkdir -p ./temp/rebrickable
@@ -62,14 +62,18 @@ if [ ! -d "./lego-data" ]; then
     unzip -o ./temp/rebrickable/minifigs.csv.zip -d ./temp/rebrickable
 
 else
-    echo ">>> 'lego-data' folder already exists. Skipping Lego data downloads."
+    echo ">>> 'lego_parts.db' already exists. Skipping Lego data downloads."
 fi
 
 # Run Blender setup script
 echo ">>> Running setup.py in Blender"
 "$BLENDER_PATH" --background --python ./setup.py
 
+if [ ! -f "lego_parts.db" ]; then
+  "$BLENDER_PATH" --background --python ./setup_sqlite.py
+fi
+
 echo ">>> Cleaning up temp files"
-#rm -rf ./temp
+rm -rf ./temp
 
 echo ">>> Setup complete at $(date)"

@@ -48,4 +48,4 @@ else:
 
 # --- Set up Python packages
 run_and_log("Bootstrapping ensurepip", [sys.executable, "-m", "ensurepip"])
-run_and_log("Installing Pillow", [sys.executable, "-m", "pip", "install", "pillow pandas"])
+run_and_log("Installing Pillow", [sys.executable, "-m", "pip", "install", "pillow"])

@@ -1,8 +1,9 @@
 import json
 import os
+import sqlite3
 
 class CocoWriter:
-    def __init__(self, output_file):
+    def __init__(self, output_file, db_path="lego_parts.db"):
         self.output_file = output_file
         self.images = []
         self.annotations = []
@@ -11,15 +12,42 @@ class CocoWriter:
         self.annotation_id = 0
         self.class_to_id = {}
 
-    def add_category(self, name):
-        if name not in self.class_to_id:
-            category_id = len(self.categories) + 1
-            self.class_to_id[name] = category_id
+        self.conn = sqlite3.connect(db_path)
+        self.load_categories()
+
+    def load_categories(self):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT part_num, name FROM parts")
+
+        for idx, (part_num, part_name) in enumerate(cursor.fetchall(), 1):
+            self.class_to_id[part_num] = idx
             self.categories.append({
-                "id": category_id,
-                "name": name,
+                "id": idx,
+                "name": part_num,  # category = part_num
                 "supercategory": "lego"
             })
+
+    def get_canonical_part_num(self, part_num):
+        cursor = self.conn.cursor()
+        query = """
+                WITH RECURSIVE variant_chain(child, parent) AS (
+                    SELECT child_part_num, parent_part_num
+                    FROM part_relationships
+                    WHERE child_part_num = ? AND rel_type IN ('P', 'M', 'T', 'A')
+
+                    UNION
+
+                    SELECT r.child_part_num, r.parent_part_num
+                    FROM part_relationships r
+                             JOIN variant_chain vc ON vc.parent = r.child_part_num
+                    WHERE r.rel_type IN ('P', 'M', 'T', 'A')
+                )
+                SELECT COALESCE(MAX(parent), ?) AS canonical_part_num
+                FROM variant_chain; \
+                """
+        cursor.execute(query, (part_num, part_num))
+        result = cursor.fetchone()
+        return result[0] if result else part_num
 
     def add_image(self, filename, width, height):
         self.image_id += 1
@@ -31,26 +59,50 @@ class CocoWriter:
         })
         return self.image_id
 
-    def add_annotation(self, image_id, category_name, bbox):
+    def add_annotation(self, image_id, part_num, bbox):
+        canonical_part = self.get_canonical_part_num(part_num)
+
+        cursor = self.conn.cursor()
+        cursor.execute("""
+                       SELECT p.part_num, p.name, c.name
+                       FROM parts p
+                                JOIN part_categories c ON p.part_cat_id = c.id
+                       WHERE p.part_num = ?
+                       """, (canonical_part,))
+        row = cursor.fetchone()
+
+        if row is None:
+            raise ValueError(f"Canonical part '{canonical_part}' not found.")
+
+        part_num, part_name, category_name = row
+
+        if part_num not in self.class_to_id:
+            raise ValueError(f"Part '{part_num}' not in loaded classes.")
+
+        category_id = self.class_to_id[part_num]
+
         self.annotation_id += 1
-        if category_name not in self.class_to_id:
-            self.add_category(category_name)
-
-        category_id = self.class_to_id[category_name]
-
         xmin, ymin, xmax, ymax = bbox
         width = xmax - xmin
         height = ymax - ymin
+
         self.annotations.append({
             "id": self.annotation_id,
             "image_id": image_id,
             "category_id": category_id,
             "bbox": [xmin, ymin, width, height],
             "area": width * height,
-            "iscrowd": 0
+            "iscrowd": 0,
+            "attributes": {
+                "original_part_num": part_num,
+                "canonical_part_num": canonical_part,
+                "part_name": part_name,
+                "category_name": category_name
+            }
         })
 
     def save(self):
+        self.conn.close()
         os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
         with open(self.output_file, 'w') as f:
             json.dump({

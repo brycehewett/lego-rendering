@@ -38,7 +38,7 @@ fi
 
 if [ ! -f "lego_parts.db" ]; then
     echo ">>> 'lego-data' folder not found. Downloading Lego data..."
-
+    # see https://rebrickable.com/downloads/
     mkdir -p ./temp/rebrickable
 
     echo ">>> Downloading Lego category data"

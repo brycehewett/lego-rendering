@@ -47,6 +47,7 @@ class CocoWriter:
                 """
         cursor.execute(query, (part_num, part_num))
         result = cursor.fetchone()
+        print(result)
         return result[0] if result else part_num
 
     def add_image(self, filename, width, height):
@@ -71,8 +72,8 @@ class CocoWriter:
                        """, (canonical_part,))
         row = cursor.fetchone()
 
-        if row is None:
-            raise ValueError(f"Canonical part '{canonical_part}' not found.")
+        # if row is None:
+        #     raise ValueError(f"Canonical part '{canonical_part}' not found.")
 
         part_num, part_name, category_name = row
 

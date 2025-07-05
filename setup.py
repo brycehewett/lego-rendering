@@ -46,6 +46,22 @@ if not addon_exists(addon_module):
 else:
     log("✅ ImportLDraw addon is already installed and enabled.")
 
+# Set Cycles as the render engine
+bpy.context.scene.render.engine = 'CYCLES'
+
+# Enable GPU compute
+bpy.context.preferences.addons['cycles'].preferences.compute_device_type = 'CUDA'  # or 'OPTIX' or 'HIP'
+
+# Refresh the device list
+bpy.context.preferences.addons['cycles'].preferences.get_devices()
+
+# Enable your desired GPU device
+for device in bpy.context.preferences.addons['cycles'].preferences.devices:
+    device.use = device.type == 'CUDA'  # or 'OPTIX', depending on your GPU
+
+# Set render device to GPU
+bpy.context.scene.cycles.device = 'GPU'
+
 # --- Set up Python packages
 run_and_log("Bootstrapping ensurepip", [sys.executable, "-m", "ensurepip"])
 run_and_log("Installing Pillow", [sys.executable, "-m", "pip", "install", "pillow"])

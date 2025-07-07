@@ -14,40 +14,28 @@ from lib.renderer.renderer import Renderer
 from lib.renderer.render_options import RenderOptions, Quality, LightingStyle, Look, Material
 from lib.colors import RebrickableColors
 
-def get_parts(part_count = 20):
-    cursor = conn.cursor()
-    query = """SELECT * FROM parts_popular LIMIT 20"""
-    cursor.execute(query)
-    result = cursor.fetchall()[0]
-    cursor.close()
-    return result
+renderer = Renderer(ldraw_path="./ldraw", annotation_path = "./dataset/annotations/instances_test.json")
 
-db_path = "lego_parts.db"
-conn = sqlite3.connect(db_path)
-parts = get_parts()
-renderer = Renderer(ldraw_path="./ldraw")
+color = RebrickableColors.Purple.value
 
-for part in parts:
-    print(part)
-    color = RebrickableColors.Purple.value
+part = 3001
 
-    options = RenderOptions(
-        image_filename = f"renders/{part}.png",
-        bounding_box_filename = f"renders/{part}.txt",
-        blender_filename = f"renders/{part}.blend",
-        quality = Quality.NORMAL,
-        lighting_style = LightingStyle.DEFAULT,
-        part_color = color.best_hex,
-        material = Material.TRANSPARENT if color.is_transparent else Material.PLASTIC,
-        light_angle = 160,
-        part_rotation=(0, 0, random.uniform(0, 360)),
-        camera_height=50,
-        zoom=1,
-        look=Look.NORMAL,
-        width=244,
-        height=244,
-    )
-    
-    renderer.render_part(part, options)
+options = RenderOptions(
+    image_filename = f"dataset/test-images/{part}.png",
+    blender_filename = f"dataset/test-images/{part}.blend",
+    quality = Quality.NORMAL,
+    lighting_style = LightingStyle.DEFAULT,
+    part_color = color.best_hex,
+    material = Material.TRANSPARENT if color.is_transparent else Material.PLASTIC,
+    light_angle = 160,
+    part_rotation=(0, 0, random.uniform(0, 360)),
+    camera_height=50,
+    zoom=1,
+    look=Look.NORMAL,
+    width=244,
+    height=244,
+)
 
-    renderer.coco_writer.save()
+renderer.render_part(part, options)
+
+renderer.coco_writer.save()

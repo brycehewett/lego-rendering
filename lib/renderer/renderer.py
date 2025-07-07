@@ -15,12 +15,12 @@ from io_scene_importldraw.loadldraw.loadldraw import LegoColours, BlenderMateria
 # This class is responsible for rendering a single image
 # for a single part. It abstracts Blender and LDraw models
 class Renderer:
-    def __init__(self, ldraw_path = "./ldraw"):
+    def __init__(self, ldraw_path = "./ldraw", annotation_path = "./dataset/annotations/instances_default.json"):
         self.ldraw_path = ldraw_path
         self.ldraw_parts_path = os.path.join(ldraw_path, "parts")
         self.ldraw_unofficial_parts_path = os.path.join(ldraw_path, "unofficial", "parts")
         self.has_imported_at_least_once = False
-        self.coco_writer = CocoWriter(output_file="./dataset/annotations/instances_train2017.json")
+        self.coco_writer = CocoWriter(output_file=f"{annotation_path}")
 
         # self.ldr_config = LdrConfig(ldraw_path="./ldraw")
         # self.ldr_config.open()
@@ -84,23 +84,19 @@ class Renderer:
         if options.blender_filename:
             bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(options.blender_filename))
 
-        # Save the bounding box coordinates in YOLO format
-        # Only if bounding box output is enabled
-        if options.bounding_box_filename:
-            # Step 1: get bounding box in pixel format
-            bbox_normalized = get_2d_bounding_box(part, camera)
-            xmin, ymin, xmax, ymax = bbox_normalized.to_pixel(options.width, options.height)
+        # Step 1: get bounding box in pixel format
+        bbox_normalized = get_2d_bounding_box(part, camera)
+        xmin, ymin, xmax, ymax = bbox_normalized.to_pixel(options.width, options.height)
 
-            # Step 2: add image and annotation to COCO writer
-            image_filename = os.path.basename(options.image_filename)
-            image_id = self.coco_writer.add_image(image_filename, options.width, options.height)
-            print(f"image_id {image_id}")
-            self.coco_writer.add_annotation(
-                image_id=image_id,
-                part_num=ldraw_part_id,
-                bbox=(xmin, ymin, xmax, ymax)
-            )
-
+        # Step 2: add image and annotation to COCO writer
+        image_filename = os.path.basename(options.image_filename)
+        image_id = self.coco_writer.add_image(image_filename, options.width, options.height)
+        print(f"image_id {image_id}")
+        self.coco_writer.add_annotation(
+            image_id=image_id,
+            part_num=ldraw_part_id,
+            bbox=(xmin, ymin, xmax, ymax),
+        )
 
     def import_part(self, ldraw_part_id, options):
         self.clear_scene()
@@ -176,8 +172,9 @@ class Renderer:
         # Delete materials because we reuse the same LDraw color
         # for all renders but change the LDRConfig to change the
         # rendered color
-        for material in bpy.data.materials:
-            bpy.data.materials.remove(material)
+        for datablock in [bpy.data.meshes, bpy.data.materials, bpy.data.textures, bpy.data.images]:
+            for block in datablock:
+                datablock.remove(block, do_unlink=True)
 
         # Clear caches. For the same reason above (LDRConfig changes)
         if self.has_imported_at_least_once:

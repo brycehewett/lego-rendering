@@ -7,24 +7,27 @@ class CocoWriter:
         self.output_file = output_file
         self.images = []
         self.annotations = []
-        self.categories = []
         self.image_id = 0
         self.annotation_id = 0
         self.class_to_id = {}
-
         self.conn = sqlite3.connect(db_path)
-        self.load_categories()
+        self.categories = []        
 
     def load_categories(self):
         cursor = self.conn.cursor()
-        cursor.execute("SELECT part_num, name FROM parts")
-
-        for idx, (part_num, part_name) in enumerate(cursor.fetchall(), 1):
-            self.class_to_id[part_num] = idx
+        cursor.execute("""
+                       SELECT p.part_num, p.name, c.name
+                       FROM parts p
+                                JOIN part_categories c ON p.part_cat_id = c.id
+                       """)
+        
+        rows = cursor.fetchall()
+        for (part_num, part_name, parent_category) in rows:
+            self.class_to_id[part_num] = part_num
             self.categories.append({
-                "id": idx,
-                "name": part_num,  # category = part_num
-                "supercategory": "lego"
+                "id": part_num,
+                "name": part_name,  # category = part_num
+                "supercategory": parent_category
             })
 
     def get_canonical_part_num(self, part_num):
@@ -47,22 +50,21 @@ class CocoWriter:
                 """
         cursor.execute(query, (part_num, part_num))
         result = cursor.fetchone()
-        print(result)
         return result[0] if result else part_num
 
     def add_image(self, filename, width, height):
         self.image_id += 1
-        self.images.append({
+        image = {
             "id": self.image_id,
             "file_name": filename,
             "width": width,
             "height": height
-        })
+        }
+        self.images.append(image)
         return self.image_id
 
     def add_annotation(self, image_id, part_num, bbox):
         canonical_part = self.get_canonical_part_num(part_num)
-
         cursor = self.conn.cursor()
         cursor.execute("""
                        SELECT p.part_num, p.name, c.name
@@ -71,43 +73,46 @@ class CocoWriter:
                        WHERE p.part_num = ?
                        """, (canonical_part,))
         row = cursor.fetchone()
-
-        # if row is None:
-        #     raise ValueError(f"Canonical part '{canonical_part}' not found.")
-
+        if row is None:
+            raise ValueError(f"Canonical part '{canonical_part}' not found.")
+    
         part_num, part_name, category_name = row
-
+    
         if part_num not in self.class_to_id:
-            raise ValueError(f"Part '{part_num}' not in loaded classes.")
-
+            # Assign a new category_id
+            new_category_id = max(self.class_to_id.values(), default=0) + 1
+            self.class_to_id[part_num] = new_category_id
+    
+            # Add new category to list
+            self.categories.append({
+                "id": new_category_id,
+                "name": part_num,
+                "supercategory": category_name  # or category_name if you want grouping
+            })
+    
         category_id = self.class_to_id[part_num]
-
+    
         self.annotation_id += 1
         xmin, ymin, xmax, ymax = bbox
         width = xmax - xmin
         height = ymax - ymin
-
+    
         self.annotations.append({
             "id": self.annotation_id,
             "image_id": image_id,
             "category_id": category_id,
             "bbox": [xmin, ymin, width, height],
             "area": width * height,
-            "iscrowd": 0,
-            "attributes": {
-                "original_part_num": part_num,
-                "canonical_part_num": canonical_part,
-                "part_name": part_name,
-                "category_name": category_name
-            }
+            "iscrowd": 0
         })
+        print(self.categories)
+        print(self.annotations)
 
     def save(self):
-        self.conn.close()
-        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
+        data = {
+            "images": self.images,
+            "annotations": self.annotations,
+            "categories": self.categories
+        }
         with open(self.output_file, 'w') as f:
-            json.dump({
-                "images": self.images,
-                "annotations": self.annotations,
-                "categories": self.categories
-            }, f, indent=2)
+            json.dump(data, f, indent=4)

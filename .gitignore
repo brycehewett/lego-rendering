@@ -5,3 +5,4 @@ ldraw-3/
 importldraw*
 *.db
 temp/
+dataset/

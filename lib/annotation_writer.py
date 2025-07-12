@@ -105,8 +105,6 @@ class CocoWriter:
             "area": width * height,
             "iscrowd": 0
         })
-        print(self.categories)
-        print(self.annotations)
 
     def save(self):
         data = {
@@ -114,5 +112,11 @@ class CocoWriter:
             "annotations": self.annotations,
             "categories": self.categories
         }
+    
+        # Create the directory if it doesn't exist
+        output_dir = os.path.dirname(self.output_file)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+    
         with open(self.output_file, 'w') as f:
             json.dump(data, f, indent=4)

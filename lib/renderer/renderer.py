@@ -91,7 +91,7 @@ class Renderer:
         # Step 2: add image and annotation to COCO writer
         image_filename = os.path.basename(options.image_filename)
         image_id = self.coco_writer.add_image(image_filename, options.width, options.height)
-        print(f"image_id {image_id}")
+
         self.coco_writer.add_annotation(
             image_id=image_id,
             part_num=ldraw_part_id,

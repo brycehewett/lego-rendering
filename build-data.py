@@ -18,7 +18,7 @@ from lib.colors import RebrickableColors
 
 def get_parts(part_count = 20):
     cursor = conn.cursor()
-    query = """SELECT * FROM parts_popular LIMIT 1"""
+    query = """SELECT * FROM parts_popular LIMIT 10"""
     cursor.execute(query)
     result = cursor.fetchall()
     cursor.close()
@@ -64,18 +64,15 @@ for part in parts:
         color = f"{db_part_color[0]}"
         is_transparent = db_part_color[1].lower() == "true"
 
-        print(f"COLOR: {color}")
-        print(f"Transparent: {is_transparent}")
-        
         options = RenderOptions(
             image_filename = f"dataset/images/{part_id}_{i}.png",
             quality = Quality.NORMAL,
-            lighting_style = LightingStyle.DEFAULT,
+            lighting_style = random.choices([LightingStyle.DEFAULT, LightingStyle.HARD], [72, 25])[0],
             part_color = color,
             material = Material.TRANSPARENT if is_transparent else Material.PLASTIC,
-            light_angle = 160,
+            light_angle = random.uniform(0, 360),
             part_rotation=(x, y, z),
-            camera_height=50,
+            camera_height=random.uniform(15, 90),
             zoom=1,
             look=Look.NORMAL,
             width=244,

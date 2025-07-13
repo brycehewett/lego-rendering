@@ -73,7 +73,7 @@ for (part_num, ldraw_id, color_ids, material_id) in rows:
 
       options = copy.copy(base_options)
       options.image_filename = image_filename
-      options.bounding_box_filename = label_filename
+      options.label_filename = label_filename
       options.quality = Quality.NORMAL
       options.part_rotation = (rx, ry, rz)
       options.camera_height = camera_height

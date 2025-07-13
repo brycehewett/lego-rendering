@@ -13,20 +13,30 @@ sys.path.insert(0, dir_path)
 from lib.renderer.renderer import Renderer
 from lib.renderer.render_options import RenderOptions, Quality, LightingStyle, Look, Material
 from lib.colors import RebrickableColors
+from lib.db_functions import *
+from lib.annotation_writer import *
 
-renderer = Renderer(ldraw_path="./ldraw", annotation_path = "./dataset/annotations/instances_test.json")
+renderer = Renderer()
+part_id = "3001"
 
-color = RebrickableColors.Purple.value
+db_part_color = get_random_color_for_part(part_id)
 
-part = 3001
+if db_part_color is None:
+    print(f"Skipping part {part_id} due to no color found.")
+
+color = f"{db_part_color[0]}"
+is_transparent = db_part_color[1].lower() == "true"
+
+create_yaml([part_id])
 
 options = RenderOptions(
-    image_filename = f"dataset/test-images/{part}.png",
-    blender_filename = f"dataset/test-images/{part}.blend",
-    quality = Quality.NORMAL,
+    image_filename = f"dataset/images/test/{part_id}.png",
+    label_filename = f"dataset/labels/test/{part_id}.txt",
+    blender_filename = f"dataset/images/test/{part_id}.blend",
+    quality = Quality.DRAFT,
     lighting_style = LightingStyle.DEFAULT,
-    part_color = color.best_hex,
-    material = Material.TRANSPARENT if color.is_transparent else Material.PLASTIC,
+    part_color = color,
+    material = Material.TRANSPARENT if is_transparent else Material.PLASTIC,
     light_angle = 160,
     part_rotation=(0, 0, random.uniform(0, 360)),
     camera_height=50,
@@ -36,6 +46,4 @@ options = RenderOptions(
     height=244,
 )
 
-renderer.render_part(part, options)
-
-renderer.coco_writer.save()
+renderer.render_part(part_id, options)

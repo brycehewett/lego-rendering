@@ -6,3 +6,5 @@ importldraw*
 *.db
 temp/
 dataset/
+runs/
+lego-env

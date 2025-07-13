@@ -1,122 +1,67 @@
-import json
 import os
-import sqlite3
+import shutil
+import random
+from collections import defaultdict
 
-class CocoWriter:
-    def __init__(self, output_file, db_path="lego_parts.db"):
-        self.output_file = output_file
-        self.images = []
-        self.annotations = []
-        self.image_id = 0
-        self.annotation_id = 0
-        self.class_to_id = {}
-        self.conn = sqlite3.connect(db_path)
-        self.categories = []        
+def create_yaml(part_names, yaml_path="dataset/lego.yaml", val_path="images/val", train_path="images/train"):
+    os.makedirs(os.path.dirname(yaml_path), exist_ok=True)  # ensure directory exists
+    with open(yaml_path, "w") as f:
+        f.write(f"train: {train_path}\n")
+        f.write(f"val: {val_path}\n\n")
+        f.write(f"nc: {len(part_names)}\n")
+        f.write("names: [")
+        f.write(", ".join(f"'{name}'" for name in part_names))
+        f.write("]\n")
 
-    def load_categories(self):
-        cursor = self.conn.cursor()
-        cursor.execute("""
-                       SELECT p.part_num, p.name, c.name
-                       FROM parts p
-                                JOIN part_categories c ON p.part_cat_id = c.id
-                       """)
-        
-        rows = cursor.fetchall()
-        for (part_num, part_name, parent_category) in rows:
-            self.class_to_id[part_num] = part_num
-            self.categories.append({
-                "id": part_num,
-                "name": part_name,  # category = part_num
-                "supercategory": parent_category
-            })
+    print(f"[OK] Wrote YOLO dataset config to: {yaml_path}")
 
-    def get_canonical_part_num(self, part_num):
-        cursor = self.conn.cursor()
-        query = """
-                WITH RECURSIVE variant_chain(child, parent) AS (
-                    SELECT child_part_num, parent_part_num
-                    FROM part_relationships
-                    WHERE child_part_num = ? AND rel_type IN ('P', 'M', 'T', 'A')
+def write_label_file(filename, bounding_box, class_id=0):
+    os.makedirs(os.path.dirname(filename), exist_ok=True)  # ensure directory exists
 
-                    UNION
+    with open(filename, "w") as f:
+        f.write(f"{class_id} {bounding_box[0]:.3f} {bounding_box[1]:.3f} {bounding_box[2]:.3f} {bounding_box[3]:.3f}\n")
+    print(f"[OK] Wrote label to: {filename}")
 
-                    SELECT r.child_part_num, r.parent_part_num
-                    FROM part_relationships r
-                             JOIN variant_chain vc ON vc.parent = r.child_part_num
-                    WHERE r.rel_type IN ('P', 'M', 'T', 'A')
-                )
-                SELECT COALESCE(MAX(parent), ?) AS canonical_part_num
-                FROM variant_chain; \
-                """
-        cursor.execute(query, (part_num, part_num))
-        result = cursor.fetchone()
-        return result[0] if result else part_num
+def split_lego_dataset(images_dir, labels_dir, output_dir, val_ratio=0.2, seed=42):
+    random.seed(seed)
+    image_files = [f for f in os.listdir(images_dir) if f.endswith(('.jpg', '.png'))]
+    label_map = defaultdict(list)
 
-    def add_image(self, filename, width, height):
-        self.image_id += 1
-        image = {
-            "id": self.image_id,
-            "file_name": filename,
-            "width": width,
-            "height": height
-        }
-        self.images.append(image)
-        return self.image_id
+    # Group images by class (based on YOLO .txt label files)
+    for img_file in image_files:
+        label_file = os.path.splitext(img_file)[0] + ".txt"
+        label_path = os.path.join(labels_dir, label_file)
+        if not os.path.exists(label_path):
+            continue
 
-    def add_annotation(self, image_id, part_num, bbox):
-        canonical_part = self.get_canonical_part_num(part_num)
-        cursor = self.conn.cursor()
-        cursor.execute("""
-                       SELECT p.part_num, p.name, c.name
-                       FROM parts p
-                                JOIN part_categories c ON p.part_cat_id = c.id
-                       WHERE p.part_num = ?
-                       """, (canonical_part,))
-        row = cursor.fetchone()
-        if row is None:
-            raise ValueError(f"Canonical part '{canonical_part}' not found.")
-    
-        part_num, part_name, category_name = row
-    
-        if part_num not in self.class_to_id:
-            # Assign a new category_id
-            new_category_id = max(self.class_to_id.values(), default=0) + 1
-            self.class_to_id[part_num] = new_category_id
-    
-            # Add new category to list
-            self.categories.append({
-                "id": new_category_id,
-                "name": part_num,
-                "supercategory": category_name  # or category_name if you want grouping
-            })
-    
-        category_id = self.class_to_id[part_num]
-    
-        self.annotation_id += 1
-        xmin, ymin, xmax, ymax = bbox
-        width = xmax - xmin
-        height = ymax - ymin
-    
-        self.annotations.append({
-            "id": self.annotation_id,
-            "image_id": image_id,
-            "category_id": category_id,
-            "bbox": [xmin, ymin, width, height],
-            "area": width * height,
-            "iscrowd": 0
-        })
+        with open(label_path) as f:
+            class_ids = {line.split()[0] for line in f.readlines() if line.strip()}
+            for class_id in class_ids:
+                label_map[class_id].append(img_file)
 
-    def save(self):
-        data = {
-            "images": self.images,
-            "annotations": self.annotations,
-            "categories": self.categories
-        }
-    
-        # Create the directory if it doesn't exist
-        output_dir = os.path.dirname(self.output_file)
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
-    
-        with open(self.output_file, 'w') as f:
-            json.dump(data, f, indent=4)
+    train_set = set()
+    val_set = set()
+
+    # Stratified split by class
+    for class_id, files in label_map.items():
+        random.shuffle(files)
+        val_count = max(1, int(len(files) * val_ratio))
+        val_set.update(files[:val_count])
+        train_set.update(files[val_count:])
+
+    def copy_split(image_list, split):
+        img_out = os.path.join(output_dir, 'images', split)
+        lbl_out = os.path.join(output_dir, 'labels', split)
+        os.makedirs(img_out, exist_ok=True)
+        os.makedirs(lbl_out, exist_ok=True)
+
+        for img_file in image_list:
+            label_file = os.path.splitext(img_file)[0] + '.txt'
+            shutil.copy(os.path.join(images_dir, img_file), os.path.join(img_out, img_file))
+            shutil.copy(os.path.join(labels_dir, label_file), os.path.join(lbl_out, label_file))
+
+    copy_split(train_set, 'train')
+    copy_split(val_set, 'val')
+
+    print(f"Split complete: {len(train_set)} train, {len(val_set)} val")
+

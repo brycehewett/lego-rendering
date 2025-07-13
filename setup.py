@@ -65,3 +65,7 @@ bpy.context.scene.cycles.device = 'GPU'
 # --- Set up Python packages
 run_and_log("Bootstrapping ensurepip", [sys.executable, "-m", "ensurepip"])
 run_and_log("Installing Pillow", [sys.executable, "-m", "pip", "install", "pillow"])
+# run_and_log("Installing Ultralytics", [sys.executable, "-m", "pip", "install", "ultralytics"])
+# run_and_log("Installing onnx", [sys.executable, "-m", "pip", "install", "onnx>=1.12.0,<1.18.0"])
+# run_and_log("Installing onnxslim", [sys.executable, "-m", "pip", "install", "onnxslim>=0.1.59"])
+# run_and_log("Installing onnxruntime-gpu", [sys.executable, "-m", "pip", "install", "onnxruntime-gpu"])

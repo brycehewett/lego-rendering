@@ -75,7 +75,7 @@ for i in range(num_images):
 
     options = RenderOptions(
         image_filename = image_filename,
-        bounding_box_filename = label_filename,
+        label_filename= label_filename,
         quality = quality,
         lighting_style = random.choices([LightingStyle.DEFAULT, LightingStyle.HARD], [72, 25])[0],
         light_angle = random.uniform(0, 360),

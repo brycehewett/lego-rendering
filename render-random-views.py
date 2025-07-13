@@ -83,7 +83,7 @@ def calculate_items_to_render(rows, num_images_per_part):
 
         options = copy.copy(base_options)
         options.image_filename = image_filename
-        options.bounding_box_filename = label_filename
+        options.label_filename = label_filename
         options.quality = Quality.NORMAL
         options.light_angle = random.uniform(0, 360)
         options.part_rotation = (random.uniform(0, 360), random.uniform(0, 360), random.uniform(0, 360))
@@ -109,10 +109,10 @@ print(f"------ {len(items)} images to render")
 for (i, options, ldraw_id) in items:
   try:
     # Check filesystem again in case another process is rendering as well
-    if os.path.exists(options.image_filename) and os.path.exists(options.bounding_box_filename):
+    if os.path.exists(options.image_filename) and os.path.exists(options.label_filename):
       print(f"------ Skipping {options.image_filename}, already exists")
       continue
-    if os.path.exists(options.image_filename) and not os.path.exists(options.bounding_box_filename):
+    if os.path.exists(options.image_filename) and not os.path.exists(options.label_filename):
       print(f"------ Regenerating {options.image_filename} with bounding box")
       os.remove(options.image_filename)
 

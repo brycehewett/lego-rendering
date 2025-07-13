@@ -7,24 +7,20 @@ from math import radians
 from lib.renderer.utils import place_object_on_ground, zoom_camera, set_height_by_angle, aim_towards_origin, get_2d_bounding_box, select_hierarchy
 from lib.renderer.lighting import setup_lighting
 from lib.renderer.render_options import Material
-from lib.annotation_writer import CocoWriter
-
+from lib.annotation_writer import *
 from io_scene_importldraw.loadldraw.loadldraw import LegoColours, BlenderMaterials
 
 # Render Lego parts
 # This class is responsible for rendering a single image
 # for a single part. It abstracts Blender and LDraw models
 class Renderer:
-    def __init__(self, ldraw_path = "./ldraw", annotation_path = "./dataset/annotations/instances_default.json"):
+    def __init__(self, ldraw_path = "./ldraw"):
         self.ldraw_path = ldraw_path
         self.ldraw_parts_path = os.path.join(ldraw_path, "parts")
         self.ldraw_unofficial_parts_path = os.path.join(ldraw_path, "unofficial", "parts")
         self.has_imported_at_least_once = False
-        self.coco_writer = CocoWriter(output_file=f"{annotation_path}")
-
-        # self.ldr_config = LdrConfig(ldraw_path="./ldraw")
-        # self.ldr_config.open()
-
+        self.class_to_id = {}
+        
     def render_part(self, ldraw_part_id, options):
         self.import_part(ldraw_part_id, options)
 
@@ -83,20 +79,11 @@ class Renderer:
         # Save a Blender file so we can debug this script
         if options.blender_filename:
             bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(options.blender_filename))
-
-        # Step 1: get bounding box in pixel format
-        bbox_normalized = get_2d_bounding_box(part, camera)
-        xmin, ymin, xmax, ymax = bbox_normalized.to_pixel(options.width, options.height)
-
-        # Step 2: add image and annotation to COCO writer
-        image_filename = os.path.basename(options.image_filename)
-        image_id = self.coco_writer.add_image(image_filename, options.width, options.height)
-
-        self.coco_writer.add_annotation(
-            image_id=image_id,
-            part_num=ldraw_part_id,
-            bbox=(xmin, ymin, xmax, ymax),
-        )
+            
+        # Save the bounding box coordinates in YOLO format
+        if options.label_filename:
+            bounding_box = get_2d_bounding_box(part, camera).to_yolo(options.width, options.height)
+            write_label_file(options.label_filename, bounding_box, options.part_class_id)
 
     def import_part(self, ldraw_part_id, options):
         self.clear_scene()

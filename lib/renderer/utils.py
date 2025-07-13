@@ -7,6 +7,8 @@ from lib.bounding_box import BoundingBox
 import glob
 from functools import reduce
 
+from lib.renderer.render_options import BackgroundType
+
 
 def rotate_object_randomly(obj, min_angle=-360, max_angle=360):
     random_x = radians(random.uniform(min_angle, max_angle))

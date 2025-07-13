@@ -20,6 +20,12 @@ class Material(Enum):
     TRANSPARENT = 'transparent'
     RUBBER = 'rubber'
 
+class BackgroundType(Enum):
+    WHITE = 'white'
+    TRANSPARENT = 'transparent'
+    GENERATED = 'generated'
+    IMAGE = 'image'
+
 class Format(Enum):
     PNG = 'PNG'
     JPEG = 'JPEG'
@@ -29,8 +35,9 @@ class RenderOptions:
                  image_filename = "renders/test.png",  # output filename
                  label_filename = None,  # optionally, output the bounding box in YOLO format
                  part_class_id = 0,
-                 width = 224,  # standard Imagenet size
-                 height = 224,  # standard Imagenet size
+                 background_type = BackgroundType.WHITE,
+                 width = 640,  # standard yolo size
+                 height = 640,  # standard yolo size
                  quality = Quality.NORMAL,  # trade between speed and quality
                  blender_filename = None,  # optionally save a .blend file to debug the render
                  lighting_style = LightingStyle.DEFAULT,  # default, soft, hard
@@ -41,8 +48,9 @@ class RenderOptions:
                  camera_height = 45,  # height of the camera as degrees above the ground plane, 0 - 180
                  zoom = 1.0,  # 1.0 for part to fill frame, < 1.0 to zoom out, > 1.0 to zoom in
                  look = Look.NORMAL,  # normal (realistic) or instructions (line art)
-                 format = Format.PNG,  # PNG = lossless, transparent backgrounds, JPG much smaller
+                 format = Format.JPEG,  # PNG = lossless, transparent backgrounds, JPG much smaller
                  ):
+        self.background_type = background_type
         self.width = width
         self.height = height
         self.quality = quality
@@ -84,11 +92,7 @@ class RenderOptions:
     @property
     def part_rotation_radian(self):
         return tuple(map(radians, self.part_rotation))
-
-    @property
-    def transparent_background(self):
-        return self.instructions
-
+    
     @property
     def render_width(self):
         return self.width * 2 if self.quality == Quality.HIGH else self.width

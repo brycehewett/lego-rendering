@@ -4,11 +4,14 @@ import os
 import tempfile
 from PIL import Image
 from math import radians
-from lib.renderer.utils import place_object_on_ground, zoom_camera, set_height_by_angle, aim_towards_origin, get_2d_bounding_box, select_hierarchy
+from lib.renderer.utils import *
 from lib.renderer.lighting import setup_lighting
-from lib.renderer.render_options import Material
+from lib.renderer.render_options import Material, BackgroundType
 from lib.annotation_writer import *
 from io_scene_importldraw.loadldraw.loadldraw import LegoColours, BlenderMaterials
+import glob
+import random
+import math
 
 # Render Lego parts
 # This class is responsible for rendering a single image
@@ -26,6 +29,8 @@ class Renderer:
 
         part = bpy.data.objects[0].children[0]
         camera = bpy.data.objects['Camera']
+        
+        print(options.background_type)
 
         # Do this after import b/c the importer overwrites some of these settings
         bpy.context.scene.render.engine = 'CYCLES'
@@ -33,15 +38,18 @@ class Renderer:
         bpy.context.scene.cycles.max_bounces = 15 if options.material == Material.TRANSPARENT else 2
         bpy.context.scene.render.resolution_x = options.render_width
         bpy.context.scene.render.resolution_y = options.render_height
-        bpy.context.scene.render.film_transparent = options.transparent_background
+        bpy.context.scene.render.film_transparent = True if options.background_type == BackgroundType.TRANSPARENT else False
         bpy.context.scene.view_settings.view_transform = 'Standard'
         bpy.data.worlds["World"].node_tree.nodes["Background"].inputs[1].default_value = 0 # turn off ambient lighting
 
         rotation = options.part_rotation_radian
         rotation = (rotation[0]+ radians(270), rotation[1], rotation[2] + radians(90)) # parts feel in a natural orientation with 90 degree z rotation
         part.rotation_euler = rotation
+        
+        if not options.background_type == BackgroundType.TRANSPARENT and not options.background_type == BackgroundType.WHITE:
+            self.set_background_image(options.background_type)
+            
         place_object_on_ground(part)
-
         setup_lighting(options)
 
         # The importer does not handle instructions look properly
@@ -134,7 +142,7 @@ class Renderer:
         # https://github.com/TobyLobster/ImportLDraw/blob/09dd286d294672c816d33e70ac10146beb69693c/importldraw.py
         bpy.ops.import_scene.importldraw(filepath=name, **{
             "ldrawPath": os.path.abspath(self.ldraw_path),
-            "addEnvironment": True,                  # add a white ground plane
+            "addEnvironment": False if options.background_type == BackgroundType.TRANSPARENT else True,                  # add a white ground plane
             "resPrims": options.res_prisms,          # high resolution primitives
             "useLogoStuds": options.use_logo_studs,  # LEGO logo on studs
             "look": options.look.value,              # normal (realistic) or instructions (line art)
@@ -167,3 +175,62 @@ class Renderer:
         if self.has_imported_at_least_once:
             LegoColours()
             BlenderMaterials.clearCache()
+
+    #TODO: make this methed switch between different backgrounds
+    def set_background_image(self, background_type=BackgroundType.IMAGE):  
+        ground = bpy.data.objects.get("LegoGroundPlane")
+        if not ground:
+            print("LegoGroundPlane not found.")
+            return
+    
+        # Load random image
+        image_dir = os.path.abspath("./lib/backgrounds")
+        images = glob.glob(os.path.join(image_dir, "*.jpg")) + glob.glob(os.path.join(image_dir, "*.png"))
+        if not images:
+            print(f"No background images found in: {image_dir}")
+            return
+    
+        img_path = random.choice(images)
+        print(f"Using background image: {img_path}")
+        img = bpy.data.images.load(img_path)
+    
+        # Create or reuse material
+        mat_name = "LegoGroundPlaneMaterial"
+        mat = bpy.data.materials.get(mat_name)
+        if not mat:
+            mat = bpy.data.materials.new(name=mat_name)
+            mat.use_nodes = True
+    
+        # Assign material only to the ground plane
+        if ground.data.materials:
+            ground.data.materials[0] = mat
+        else:
+            ground.data.materials.append(mat)
+    
+        # Clear and set up new nodes
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        nodes.clear()
+    
+        # Create nodes
+        tex_image = nodes.new('ShaderNodeTexImage')
+        tex_image.image = img
+    
+        bsdf = nodes.new('ShaderNodeBsdfPrincipled')
+        output = nodes.new('ShaderNodeOutputMaterial')
+    
+        tex_coord = nodes.new('ShaderNodeTexCoord')
+        mapping = nodes.new('ShaderNodeMapping')
+    
+        # Link nodes
+        links.new(tex_coord.outputs['UV'], mapping.inputs['Vector'])
+        links.new(mapping.outputs['Vector'], tex_image.inputs['Vector'])
+        links.new(tex_image.outputs['Color'], bsdf.inputs['Base Color'])
+        links.new(bsdf.outputs['BSDF'], output.inputs['Surface'])
+    
+        print("Updated texture on LegoGroundPlane.")
+
+        ground.scale = (.006, .006, 1)  # X and Y scaled down, Z left unchanged
+        bpy.context.view_layer.objects.active = ground
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        print("Background image applied to LegoGroundPlane.")

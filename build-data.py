@@ -13,13 +13,20 @@ sys.path.insert(0, dir_path)
 
 from lib.renderer.renderer import Renderer
 from lib.renderer.render_options import RenderOptions, Quality, LightingStyle, Look, Material
-from lib.colors import RebrickableColors
-
+from lib.renderer.render_options import BackgroundType
 from lib.db_functions import * 
 from lib.annotation_writer import *
 
-parts = get_parts(20)
+parts = get_parts(30)
 renderer = Renderer()
+
+background_distribution = {
+    BackgroundType.WHITE: 50,
+    BackgroundType.IMAGE: 50,
+}
+
+background_types = list(background_distribution.keys())
+weights = list(background_distribution.values())
 
 create_yaml(parts)
 
@@ -32,6 +39,7 @@ for partIndex, part in enumerate(parts):
     print(f"Rendering {part}...")
     # Iterate over combinations of angles
     for variantIndex, (x, y, z) in enumerate(itertools.product(x_angles, y_angles, z_angles)):
+        background_type = random.choices(background_types, weights=weights)[0]
         db_part_color = get_random_color_for_part(part)
 
         if db_part_color is None:
@@ -52,10 +60,7 @@ for partIndex, part in enumerate(parts):
             light_angle = random.uniform(0, 360),
             part_rotation=(x, y, z),
             camera_height=random.uniform(15, 90),
-            zoom=1,
-            look=Look.NORMAL,
-            width=244,
-            height=244,
+            background_type = background_type
         )
 
         renderer.render_part(part, options)

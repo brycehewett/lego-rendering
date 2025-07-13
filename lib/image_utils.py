@@ -25,3 +25,4 @@ def get_default_font():
         return 'arial.ttf'
     elif os.name == 'posix':  # Linux or Mac
         return '/Library/Fonts/Arial.ttf'
+    
